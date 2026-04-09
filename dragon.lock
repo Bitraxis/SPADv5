@@ -2,9 +2,5 @@
 [[module]]
 name = "presentation"
 version = "1.2.3"
-source = "ftp://central"
+source = "/packages-local/P/presentation.spad"
 
-[[module]]
-name = "graph"
-version = "2.0.1"
-source = "https://repo.spad-lang.org/ftp"

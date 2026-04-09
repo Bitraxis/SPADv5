@@ -1,9 +1,9 @@
 [spad]
 language = "SPAD"
-version = "0.1.0"
+version = "5.0.0"
 
 [repos]
-sources = ["ftp://central", "https://repo.spad-lang.org/ftp"]
+sources = ["packages-local"]
 local_sources = ["packages-local"]
 
 [packages]
