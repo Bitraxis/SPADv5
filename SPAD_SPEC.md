@@ -1,4 +1,4 @@
-# SPAD Language Direction (Simple Projecting Automating Directive)
+# SPAD Language Direction (The Simple Projecting Automating Directive Language)
 
 SPAD stands for: Simple Projecting Automating Directive.
 Dragon is the main compiler and toolkit project for SPAD.
@@ -26,8 +26,65 @@ Dragon is the main compiler and toolkit project for SPAD.
 ## JVM Targeting
 - SPAD is transpiled to Java source.
 - Java output can be compiled with `javac` and run on the JVM.
+- SPAD compiler can also package compiled output into a `.jre` bundle (jar format with `.jre` extension and `Main-Class` manifest).
 - Runtime helpers are provided through a prelude class.
 - Dragon runtime metadata is included in generated Java classes.
+
+## Current vs Planned Status
+
+### Implemented Now
+- Imports, package-use directives, variable declarations, functions, automate blocks.
+- Lists and dictionaries.
+- Return statements and expression statements.
+- Java generation, JVM class compilation, and optional `.jre` bundle packaging.
+
+### Planned (Not Implemented Yet)
+The syntax below is part of direction and examples but not currently accepted by the parser/runtime.
+
+#### Control Flow Blocks
+```spad
+if (score > 10) {
+  print("high")
+} else {
+  print("low")
+}
+
+while (hp > 0) {
+  hp = hp - 1
+}
+```
+
+#### Range and For Loops
+```spad
+for i in 0..10 {
+  print(i)
+}
+```
+
+#### Match Expressions
+```spad
+match mode {
+  "dev" => print("debug"),
+  "prod" => print("fast")
+}
+```
+
+#### Pipeline Operator
+```spad
+var out = data |> normalize() |> summarize()
+```
+
+#### Package Export Blocks
+```spad
+export toolkit {
+  func helper(x = Int) = Int { return (x + 1) }
+}
+```
+
+#### Java Interop Short Form
+```spad
+var now = java::java.time.Instant.now()
+```
 
 ## Dragon Toolkit Focus
 - Compiler/tooling project name: `dragon`.

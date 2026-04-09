@@ -1,0 +1,7 @@
+project Confetti {
+  projection vibe = "party"
+
+  func burst(name = String) = String {
+    return ("*** confetti burst for " + name + " ***")
+  }
+}

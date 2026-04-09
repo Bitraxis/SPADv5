@@ -5,7 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-class DragonToolkit {
+public class DragonToolkit {
     private static final Set<String> ENABLED_PACKAGES = new LinkedHashSet<>();
     private static final Set<String> EXTENSION_LANGUAGES = new LinkedHashSet<>();
     private static final List<String> REPOSITORIES = new ArrayList<>();

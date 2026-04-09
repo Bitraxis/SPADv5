@@ -1,5 +1,7 @@
 # Java build outputs
 *.class
+build/
+dist/
 
 # Dragon local install/cache state (generated per-user)
 .dragon/

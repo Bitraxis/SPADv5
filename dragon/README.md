@@ -13,9 +13,36 @@ Dragon is the SPAD project manager and toolchain controller.
 
 ## Commands
 
+- `java dragon.DragonMain help`
+- `java dragon.DragonMain resolve --workspace . --source main/main.spad`
+- `java dragon.DragonMain compile --workspace . --source main/main.spad --out build/spad`
+- `java dragon.DragonMain package --workspace . --source main/main.spad --jre-out build/spad/App.jre`
+- `java dragon.DragonMain list-packages --workspace .`
+- `java dragon.DragonMain install-spad --workspace .`
+
+## Preferred CLI Entry
+
+Dragon is the primary manager CLI for SPAD projects.
+
+After running the root install scripts (`scripts/install.sh` or `scripts/install.cmd`), use:
+
+- `dragon help`
+- `dragon compile --workspace . --source main/main.spad`
+- `dragon package --workspace . --source main/main.spad`
+
+### Compile vs Package
+
+- `compile` only compiles the selected source file to JVM classes by default.
+- `.jre` output is opt-in on `compile` using `--jre`.
+- `package` always emits a `.jre` bundle for the selected source file.
+- Dragon does not compile every `.spad` file automatically; you choose the source entry per command.
+
+### Legacy Compatibility
+
+Old positional calls still work:
+
 - `java dragon.DragonMain resolve . main/main.spad`
 - `java dragon.DragonMain compile . main/main.spad`
-- `java dragon.DragonMain install-spad .`
 
 ## Import Syntax Supported
 

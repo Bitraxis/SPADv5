@@ -30,8 +30,36 @@ entry = "spad-core.spad"
 kind = "spad"
 
 [[package]]
-name = "dragon"
-set = "L"
-version = "5.0.0"
-entry = "dragon.class"
+name = "arcade-math"
+set = "A"
+version = "0.1.0"
+entry = "ArcadeMath.java"
 kind = "java"
+
+[[package]]
+name = "partybot"
+set = "D"
+version = "0.1.0"
+entry = "partybot.lua"
+kind = "lua"
+
+[[package]]
+name = "confetti"
+set = "P"
+version = "0.1.0"
+entry = "confetti.spad"
+kind = "spad"
+
+[[package]]
+name = "dicekit"
+set = "T"
+version = "0.1.0"
+entry = "dice.spad"
+kind = "spad"
+
+[[package]]
+name = "soundboard"
+set = "S"
+version = "0.1.0"
+entry = "soundboard.lua"
+kind = "lua"

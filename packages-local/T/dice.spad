@@ -1,0 +1,7 @@
+project DiceKit {
+  projection game = "tabletop"
+
+  func cheer(name = String) = String {
+    return ("Let the dice fly, " + name)
+  }
+}

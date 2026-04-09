@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 
-class SpadPrelude {
+public class SpadPrelude {
     private SpadPrelude() {}
 
     public static void directive(String name, Object... args) {

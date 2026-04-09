@@ -6,7 +6,14 @@ import java.util.stream.Collectors;
 
 class JavaEmitter {
     public String emitProgram(Program program, String className) {
+        return emitProgram(program, className, null);
+    }
+
+    public String emitProgram(Program program, String className, String packageName) {
         StringBuilder out = new StringBuilder();
+        if (packageName != null && !packageName.isBlank()) {
+            out.append("package ").append(packageName).append(";\n\n");
+        }
         out.append("import java.util.*;\n\n");
         out.append("public class ").append(className).append(" {\n");
         out.append(indent(1)).append("static {\n");
