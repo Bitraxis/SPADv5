@@ -1,0 +1,8 @@
+import presentation = ">=1.2.0" from "ftp://central"
+import graph = "^2.0.0" from "https://repo.spad-lang.org/ftp"
+
+dragon = {presentation, graph, automation}
+
+project CoreGraph {
+  projection version = "0.1"
+}

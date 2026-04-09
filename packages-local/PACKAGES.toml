@@ -1,0 +1,37 @@
+# Dragon package index
+# Package sets: T, S, P, A, D, L
+
+[[package]]
+name = "presentation"
+set = "P"
+version = "1.2.3"
+entry = "presentation.spad"
+kind = "spad"
+
+[[package]]
+name = "graph"
+set = "A"
+version = "2.0.1"
+entry = "GraphPackage.java"
+kind = "java"
+
+[[package]]
+name = "automation"
+set = "D"
+version = "1.0.0"
+entry = "automation.lua"
+kind = "lua"
+
+[[package]]
+name = "spad-core"
+set = "L"
+version = "5.0.0"
+entry = "spad-core.spad"
+kind = "spad"
+
+[[package]]
+name = "dragon"
+set = "L"
+version = "5.0.0"
+entry = "dragon.class"
+kind = "java"

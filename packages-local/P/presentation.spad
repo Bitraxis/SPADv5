@@ -1,0 +1,3 @@
+project Presentation {
+  projection title = "SPAD Presentation Toolkit"
+}

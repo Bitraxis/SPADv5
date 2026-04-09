@@ -1,0 +1,13 @@
+[spad]
+language = "SPAD"
+version = "0.1.0"
+
+[repos]
+sources = ["ftp://central", "https://repo.spad-lang.org/ftp"]
+local_sources = ["packages-local"]
+
+[packages]
+sets = ["T", "S", "P", "A", "D", "L"]
+
+[extensions]
+languages = ["spad", "java", "lua"]

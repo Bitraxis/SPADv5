@@ -1,0 +1,25 @@
+# Java build outputs
+*.class
+
+# Dragon local install/cache state (generated per-user)
+.dragon/
+
+# Optional IDE/system noise
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db
+
+# Keep source + package indexes in repo
+!main/*.java
+!main/*.spad
+!dragon/*.java
+!dragon/*.md
+!spad.toml
+!dragon.lock
+!SPAD_SPEC.md
+!packages-local/PACKAGES.toml
+!packages-local/**/*.spad
+!packages-local/**/*.java
+!packages-local/**/*.lua
