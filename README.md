@@ -1,6 +1,7 @@
 # SPAD - The Simple Projective Automatic Directive Language - V5
 
 - NEW! - Back on GitHub and git...
+- Needs Java 25
 
 ## Build
 
