@@ -38,8 +38,6 @@ Dragon is the main compiler and toolkit project for SPAD.
 - Return statements and expression statements.
 - Java generation, JVM class compilation, and optional `.jre` bundle packaging.
 
-### Planned (Not Implemented Yet)
-The syntax below is part of direction and examples but not currently accepted by the parser/runtime.
 
 #### Control Flow Blocks
 ```spad
@@ -90,9 +88,10 @@ var now = java::java.time.Instant.now()
 - Compiler/tooling project name: `dragon`.
 - Dragon is a separate program under `dragon/` and acts as SPAD manager (similar role to Maven/Gradle for SPAD projects).
 - Tracks SPAD language versions (current bootstrap example: `0.1.0`).
-- Package import model with central repositories:
+- Package import model with central repositories (if there's one):
   - `ftp://central`
   - `https://repo.spad-lang.org/ftp`
+  - `packages-local` = Local directory
 - Package usage inside SPAD uses:
   - `dragon = {presentation, graph, automation}`
 - Module import syntax:
