@@ -1,4 +1,4 @@
-# SPAD - The Simple Automative Directive Language - V5
+# SPAD - The Simple Projective Automatic Directive Language - V5
 
 - NEW! - Back on GitHub and git...
 
