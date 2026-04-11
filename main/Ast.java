@@ -92,6 +92,16 @@ class AutomateDecl extends Stmt {
     }
 }
 
+class ExportDecl extends Stmt {
+    public final String name;
+    public final List<Stmt> body;
+
+    public ExportDecl(String name, List<Stmt> body) {
+        this.name = name;
+        this.body = body;
+    }
+}
+
 class DirectiveStmt extends Stmt {
     public final String name;
     public final List<Expr> arguments;
@@ -133,6 +143,42 @@ class BlockStmt extends Stmt {
 
     public BlockStmt(List<Stmt> statements) {
         this.statements = statements;
+    }
+}
+
+class IfStmt extends Stmt {
+    public final Expr condition;
+    public final Stmt thenBranch;
+    public final Stmt elseBranch;
+
+    public IfStmt(Expr condition, Stmt thenBranch, Stmt elseBranch) {
+        this.condition = condition;
+        this.thenBranch = thenBranch;
+        this.elseBranch = elseBranch;
+    }
+}
+
+class WhileStmt extends Stmt {
+    public final Expr condition;
+    public final Stmt body;
+
+    public WhileStmt(Expr condition, Stmt body) {
+        this.condition = condition;
+        this.body = body;
+    }
+}
+
+class ForRangeStmt extends Stmt {
+    public final String variable;
+    public final Expr start;
+    public final Expr end;
+    public final Stmt body;
+
+    public ForRangeStmt(String variable, Expr start, Expr end, Stmt body) {
+        this.variable = variable;
+        this.start = start;
+        this.end = end;
+        this.body = body;
     }
 }
 
@@ -237,6 +283,38 @@ class DictEntry {
     public DictEntry(String key, Expr value) {
         this.key = key;
         this.value = value;
+    }
+}
+
+class MatchExpr extends Expr {
+    public final Expr value;
+    public final List<MatchArm> arms;
+
+    public MatchExpr(Expr value, List<MatchArm> arms) {
+        this.value = value;
+        this.arms = arms;
+    }
+}
+
+class MatchArm {
+    public final boolean wildcard;
+    public final Expr pattern;
+    public final Expr guard;
+    public final Expr result;
+
+    public MatchArm(boolean wildcard, Expr pattern, Expr guard, Expr result) {
+        this.wildcard = wildcard;
+        this.pattern = pattern;
+        this.guard = guard;
+        this.result = result;
+    }
+}
+
+class JavaInteropExpr extends Expr {
+    public final String qualifiedName;
+
+    public JavaInteropExpr(String qualifiedName) {
+        this.qualifiedName = qualifiedName;
     }
 }
 

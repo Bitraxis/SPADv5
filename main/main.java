@@ -78,6 +78,9 @@ public class main {
         Parser parser = new Parser(tokens);
         Program program = parser.parseProgram();
 
+        StaticTypeChecker typeChecker = new StaticTypeChecker();
+        typeChecker.check(program);
+
         JavaEmitter emitter = new JavaEmitter();
         String javaCode = emitter.emitProgram(program, className, DEFAULT_PACKAGE);
 

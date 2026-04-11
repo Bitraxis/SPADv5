@@ -18,10 +18,15 @@ class Lexer {
         KEYWORDS.put("projection", TokenType.PROJECTION);
         KEYWORDS.put("directive", TokenType.DIRECTIVE);
         KEYWORDS.put("automate", TokenType.AUTOMATE);
+        KEYWORDS.put("export", TokenType.EXPORT);
         KEYWORDS.put("return", TokenType.RETURN);
         KEYWORDS.put("if", TokenType.IF);
         KEYWORDS.put("else", TokenType.ELSE);
         KEYWORDS.put("while", TokenType.WHILE);
+        KEYWORDS.put("for", TokenType.FOR);
+        KEYWORDS.put("in", TokenType.IN);
+        KEYWORDS.put("match", TokenType.MATCH);
+        KEYWORDS.put("when", TokenType.WHEN);
         KEYWORDS.put("true", TokenType.TRUE);
         KEYWORDS.put("false", TokenType.FALSE);
         KEYWORDS.put("null", TokenType.NULL);
@@ -58,16 +63,44 @@ class Lexer {
             case '[': addToken(TokenType.LEFT_BRACKET); break;
             case ']': addToken(TokenType.RIGHT_BRACKET); break;
             case ',': addToken(TokenType.COMMA); break;
-            case '.': addToken(TokenType.DOT); break;
+            case '.':
+                if (match('.')) {
+                    addToken(TokenType.RANGE);
+                } else {
+                    addToken(TokenType.DOT);
+                }
+                break;
+            case ':':
+                if (match(':')) {
+                    addToken(TokenType.DOUBLE_COLON);
+                } else {
+                    throw error("Unexpected ':'");
+                }
+                break;
             case ';': addToken(TokenType.SEMICOLON); break;
             case '+': addToken(TokenType.PLUS); break;
             case '-': addToken(TokenType.MINUS); break;
             case '*': addToken(TokenType.STAR); break;
             case '%': addToken(TokenType.PERCENT); break;
             case '!': addToken(match('=') ? TokenType.BANG_EQUAL : TokenType.BANG); break;
-            case '=': addToken(match('=') ? TokenType.EQUAL_EQUAL : TokenType.EQUAL); break;
+            case '=':
+                if (match('=')) {
+                    addToken(TokenType.EQUAL_EQUAL);
+                } else if (match('>')) {
+                    addToken(TokenType.FAT_ARROW);
+                } else {
+                    addToken(TokenType.EQUAL);
+                }
+                break;
             case '<': addToken(match('=') ? TokenType.LESS_EQUAL : TokenType.LESS); break;
             case '>': addToken(match('=') ? TokenType.GREATER_EQUAL : TokenType.GREATER); break;
+            case '|':
+                if (match('>')) {
+                    addToken(TokenType.PIPE_GT);
+                } else {
+                    throw error("Unexpected '|'");
+                }
+                break;
             case '/':
                 if (match('/')) {
                     while (peek() != '\n' && !isAtEnd()) {

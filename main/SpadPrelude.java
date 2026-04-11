@@ -5,10 +5,16 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.PriorityQueue;
 
 public class SpadPrelude {
     private SpadPrelude() {}
+
+    public static Object print(Object value) {
+        System.out.println(value);
+        return value;
+    }
 
     public static void directive(String name, Object... args) {
         System.out.println("[directive] " + name + " " + java.util.Arrays.toString(args));
@@ -30,6 +36,32 @@ public class SpadPrelude {
 
     public static String toStringValue(Object value) {
         return String.valueOf(value);
+    }
+
+    public static boolean truthy(Object value) {
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue() != 0.0;
+        }
+        if (value instanceof CharSequence) {
+            return ((CharSequence) value).length() > 0;
+        }
+        if (value instanceof java.util.Collection<?>) {
+            return !((java.util.Collection<?>) value).isEmpty();
+        }
+        if (value instanceof java.util.Map<?, ?>) {
+            return !((java.util.Map<?, ?>) value).isEmpty();
+        }
+        return true;
+    }
+
+    public static boolean eq(Object left, Object right) {
+        return Objects.equals(left, right);
     }
 
     public static Map<String, Integer> dijkstra(

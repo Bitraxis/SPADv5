@@ -38,6 +38,9 @@ public class DragonMain {
             case "resolve":
                 resolveImports(options.workspace, options.sourceFile, options.verbose);
                 return;
+            case "profiles":
+                listProjectionProfiles(options.sourceFile);
+                return;
             case "compile":
                 compileSpad(options, false);
                 return;
@@ -61,6 +64,10 @@ public class DragonMain {
 
     private static void compileSpad(CliOptions options, boolean forceJre) throws Exception {
         System.out.println("dragon :: compile requested for " + options.sourceFile);
+        ProjectionProfileEngine.ProjectionProfile activeProfile = resolveActiveProjection(options);
+        if (options.listProfilesOnly) {
+            return;
+        }
         resolveImports(options.workspace, options.sourceFile, options.verbose);
 
         List<String> compilerArgs = new ArrayList<>();
@@ -85,7 +92,53 @@ public class DragonMain {
             }
         }
 
-        invokeSpadCompiler(options.workspace, compilerArgs);
+        Map<String, String> systemProperties = new LinkedHashMap<>();
+        if (activeProfile != null) {
+            systemProperties.put("dragon.profile.project", activeProfile.project);
+            systemProperties.put("dragon.profile.name", activeProfile.name);
+            systemProperties.put("dragon.profile.value", activeProfile.normalizedValue());
+        }
+
+        invokeSpadCompiler(options.workspace, compilerArgs, systemProperties);
+    }
+
+    private static ProjectionProfileEngine.ProjectionProfile resolveActiveProjection(CliOptions options) throws IOException {
+        ProjectionProfileEngine engine = new ProjectionProfileEngine();
+        List<ProjectionProfileEngine.ProjectionProfile> profiles = engine.scan(options.sourceFile);
+
+        if (options.listProfilesOnly) {
+            listProjectionProfiles(options.sourceFile);
+            return null;
+        }
+
+        if (options.projectionName == null || options.projectionName.isBlank()) {
+            return null;
+        }
+
+        ProjectionProfileEngine.ProjectionProfile profile = engine.resolveByName(profiles, options.projectionName);
+        if (profile == null) {
+            throw new IllegalArgumentException("Projection profile not found: " + options.projectionName
+                    + " (run 'dragon profiles --source " + options.sourceFile + "')");
+        }
+
+        System.out.println("dragon :: active profile project=" + profile.project
+                + " projection=" + profile.name
+                + " value=" + profile.normalizedValue());
+        return profile;
+    }
+
+    private static void listProjectionProfiles(Path sourceFile) throws IOException {
+        ProjectionProfileEngine engine = new ProjectionProfileEngine();
+        List<ProjectionProfileEngine.ProjectionProfile> profiles = engine.scan(sourceFile);
+        if (profiles.isEmpty()) {
+            System.out.println("dragon :: no projection profiles found in " + sourceFile);
+            return;
+        }
+
+        System.out.println("dragon :: projection profiles in " + sourceFile + ":");
+        for (ProjectionProfileEngine.ProjectionProfile profile : profiles) {
+            System.out.println("  - project=" + profile.project + " projection=" + profile.name + " value=" + profile.normalizedValue());
+        }
     }
 
     private static void resolveImports(Path workspace, Path spadSource, boolean verbose) throws IOException {
@@ -142,12 +195,15 @@ public class DragonMain {
         System.out.println("dragon :: package count=" + total + " by-kind=" + countByKind);
     }
 
-    private static void invokeSpadCompiler(Path workspace, List<String> compilerArgs) throws Exception {
+    private static void invokeSpadCompiler(Path workspace, List<String> compilerArgs, Map<String, String> systemProperties) throws Exception {
         String javaBin = resolveJavaBinary();
         String classPath = System.getProperty("java.class.path");
 
         List<String> command = new ArrayList<>();
         command.add(javaBin);
+        for (Map.Entry<String, String> property : systemProperties.entrySet()) {
+            command.add("-D" + property.getKey() + "=" + property.getValue());
+        }
         command.add("-cp");
         command.add(classPath);
         command.add("main.main");
@@ -186,6 +242,8 @@ public class DragonMain {
         boolean jre = false;
         Path jreOut = null;
         boolean verbose = false;
+        String projection = null;
+        boolean listProfilesOnly = false;
 
         int i = 0;
         while (i < args.length) {
@@ -212,6 +270,11 @@ public class DragonMain {
                 jreOut = Path.of(args[i]);
             } else if ("--verbose".equals(arg) || "-v".equals(arg)) {
                 verbose = true;
+            } else if ("--projection".equals(arg) || "-p".equals(arg)) {
+                i = requireValueIndex(args, i, arg);
+                projection = args[i];
+            } else if ("--list-profiles".equals(arg)) {
+                listProfilesOnly = true;
             } else if (arg.startsWith("-")) {
                 throw new IllegalArgumentException("Unknown option: " + arg);
             } else {
@@ -247,7 +310,7 @@ public class DragonMain {
             jreOut = jreOut.toAbsolutePath().normalize();
         }
 
-        return new CliOptions(workspace, source, outDir, className, run, jre, jreOut, verbose);
+        return new CliOptions(workspace, source, outDir, className, run, jre, jreOut, verbose, projection, listProfilesOnly);
     }
 
     private static int requireValueIndex(String[] args, int currentIndex, String option) {
@@ -267,6 +330,7 @@ public class DragonMain {
         System.out.println("Usage: java dragon.DragonMain <command> [options]");
         System.out.println("Commands:");
         System.out.println("  resolve       Resolve imports for a source file");
+        System.out.println("  profiles      List project/projection build profiles from a source file");
         System.out.println("  compile       Resolve + compile one .spad file to classes (optional --run, --jre)");
         System.out.println("  package       Resolve + compile + emit .jre bundle for one .spad file");
         System.out.println("  list-packages List packages from configured local package directories");
@@ -279,6 +343,8 @@ public class DragonMain {
         System.out.println("  --run                   Run compiled main class after build");
         System.out.println("  --jre                   Emit .jre bundle");
         System.out.println("  --jre-out <file.jre>    Custom .jre output file path");
+        System.out.println("  --projection, -p <name> Activate one projection profile by name");
+        System.out.println("  --list-profiles         Print profiles discovered in source and stop");
         System.out.println("  --verbose, -v           Print resolver configuration details");
         System.out.println("Legacy positional mode still works: java dragon.DragonMain resolve . main/main.spad");
     }
@@ -292,6 +358,8 @@ public class DragonMain {
         private final boolean emitJreBundle;
         private final Path jreOutputPath;
         private final boolean verbose;
+        private final String projectionName;
+        private final boolean listProfilesOnly;
 
         private CliOptions(
                 Path workspace,
@@ -301,7 +369,9 @@ public class DragonMain {
                 boolean runCompiledClass,
                 boolean emitJreBundle,
                 Path jreOutputPath,
-                boolean verbose
+                boolean verbose,
+                String projectionName,
+                boolean listProfilesOnly
         ) {
             this.workspace = workspace;
             this.sourceFile = sourceFile;
@@ -311,6 +381,8 @@ public class DragonMain {
             this.emitJreBundle = emitJreBundle;
             this.jreOutputPath = jreOutputPath;
             this.verbose = verbose;
+            this.projectionName = projectionName;
+            this.listProfilesOnly = listProfilesOnly;
         }
     }
 }

@@ -1,6 +1,7 @@
 package main;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 class Parser {
@@ -42,6 +43,9 @@ class Parser {
         }
         if (match(TokenType.AUTOMATE)) {
             return parseAutomateDecl();
+        }
+        if (match(TokenType.EXPORT)) {
+            return parseExportDecl();
         }
         return parseStatement();
     }
@@ -156,6 +160,13 @@ class Parser {
         return new AutomateDecl(name.lexeme, parameters, returnType, body);
     }
 
+    private Stmt parseExportDecl() {
+        Token name = consume(TokenType.IDENTIFIER, "Expected export block name");
+        consume(TokenType.LEFT_BRACE, "Expected '{' before export block body");
+        List<Stmt> body = parseBlockStatements();
+        return new ExportDecl(name.lexeme, body);
+    }
+
     private List<Stmt> parseBlockStatements() {
         List<Stmt> statements = new ArrayList<>();
         skipSeparators();
@@ -168,6 +179,15 @@ class Parser {
     }
 
     private Stmt parseStatement() {
+        if (match(TokenType.IF)) {
+            return parseIfStmt();
+        }
+        if (match(TokenType.WHILE)) {
+            return parseWhileStmt();
+        }
+        if (match(TokenType.FOR)) {
+            return parseForRangeStmt();
+        }
         if (match(TokenType.DIRECTIVE)) {
             return parseDirectiveStmt();
         }
@@ -196,12 +216,42 @@ class Parser {
         return new DirectiveStmt(name.lexeme, args);
     }
 
+    private Stmt parseIfStmt() {
+        consume(TokenType.LEFT_PAREN, "Expected '(' after if");
+        Expr condition = parseExpression();
+        consume(TokenType.RIGHT_PAREN, "Expected ')' after if condition");
+        Stmt thenBranch = parseStatement();
+        Stmt elseBranch = null;
+        if (match(TokenType.ELSE)) {
+            elseBranch = parseStatement();
+        }
+        return new IfStmt(condition, thenBranch, elseBranch);
+    }
+
+    private Stmt parseWhileStmt() {
+        consume(TokenType.LEFT_PAREN, "Expected '(' after while");
+        Expr condition = parseExpression();
+        consume(TokenType.RIGHT_PAREN, "Expected ')' after while condition");
+        Stmt body = parseStatement();
+        return new WhileStmt(condition, body);
+    }
+
+    private Stmt parseForRangeStmt() {
+        Token variable = consume(TokenType.IDENTIFIER, "Expected loop variable after for");
+        consume(TokenType.IN, "Expected 'in' after loop variable");
+        Expr start = parseExpression();
+        consume(TokenType.RANGE, "Expected '..' in for range");
+        Expr end = parseExpression();
+        Stmt body = parseStatement();
+        return new ForRangeStmt(variable.lexeme, start, end, body);
+    }
+
     private Expr parseExpression() {
         return parseAssignment();
     }
 
     private Expr parseAssignment() {
-        Expr expr = parseEquality();
+        Expr expr = parsePipeline();
         if (match(TokenType.EQUAL)) {
             Token equals = previous();
             Expr value = parseAssignment();
@@ -209,6 +259,23 @@ class Parser {
                 return new AssignExpr(((VariableExpr) expr).name, value);
             }
             throw error(equals, "Invalid assignment target");
+        }
+        return expr;
+    }
+
+    private Expr parsePipeline() {
+        Expr expr = parseEquality();
+        while (match(TokenType.PIPE_GT)) {
+            Expr stage = parseCall();
+            if (stage instanceof CallExpr) {
+                CallExpr call = (CallExpr) stage;
+                List<Expr> args = new ArrayList<>();
+                args.add(expr);
+                args.addAll(call.arguments);
+                expr = new CallExpr(call.callee, args);
+            } else {
+                expr = new CallExpr(stage, Collections.singletonList(expr));
+            }
         }
         return expr;
     }
@@ -285,6 +352,22 @@ class Parser {
     }
 
     private Expr parsePrimary() {
+        if (check(TokenType.IDENTIFIER)
+                && "java".equals(peek().lexeme)
+                && checkNext(TokenType.DOUBLE_COLON)) {
+            advance();
+            consume(TokenType.DOUBLE_COLON, "Expected '::' after java");
+            StringBuilder qualified = new StringBuilder();
+            qualified.append(consume(TokenType.IDENTIFIER, "Expected Java package or class name").lexeme);
+            while (match(TokenType.DOT)) {
+                qualified.append('.');
+                qualified.append(consume(TokenType.IDENTIFIER, "Expected Java member name").lexeme);
+            }
+            return new JavaInteropExpr(qualified.toString());
+        }
+        if (match(TokenType.MATCH)) {
+            return parseMatchExpr();
+        }
         if (match(TokenType.FALSE)) return new LiteralExpr(false);
         if (match(TokenType.TRUE)) return new LiteralExpr(true);
         if (match(TokenType.NULL)) return new LiteralExpr(null);
@@ -325,6 +408,41 @@ class Parser {
         }
 
         throw error(peek(), "Expected expression");
+    }
+
+    private Expr parseMatchExpr() {
+        Expr value = parseExpression();
+        consume(TokenType.LEFT_BRACE, "Expected '{' after match expression value");
+
+        List<MatchArm> arms = new ArrayList<>();
+        skipSeparators();
+        while (!check(TokenType.RIGHT_BRACE) && !isAtEnd()) {
+            boolean wildcard = false;
+            Expr pattern = null;
+            if (check(TokenType.IDENTIFIER) && "_".equals(peek().lexeme)) {
+                wildcard = true;
+                advance();
+            } else {
+                pattern = parseExpression();
+            }
+
+            Expr guard = null;
+            if (match(TokenType.WHEN)) {
+                consume(TokenType.LEFT_PAREN, "Expected '(' after when");
+                guard = parseExpression();
+                consume(TokenType.RIGHT_PAREN, "Expected ')' after match guard");
+            }
+
+            consume(TokenType.FAT_ARROW, "Expected '=>' after match pattern");
+            Expr result = parseExpression();
+            arms.add(new MatchArm(wildcard, pattern, guard, result));
+            if (!match(TokenType.COMMA)) {
+                skipSeparators();
+            }
+            skipSeparators();
+        }
+        consume(TokenType.RIGHT_BRACE, "Expected '}' after match expression");
+        return new MatchExpr(value, arms);
     }
 
     private boolean isStatementEnd(Token token) {

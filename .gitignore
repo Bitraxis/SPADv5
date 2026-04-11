@@ -2,6 +2,7 @@
 *.class
 build/
 dist/
+--prefix
 
 # Dragon local install/cache state (generated per-user)
 .dragon/
