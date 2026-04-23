@@ -1,0 +1,65 @@
+# Dragon package index
+# Package sets: T, S, P, A, D, L
+
+[[package]]
+name = "presentation"
+set = "P"
+version = "1.2.3"
+entry = "presentation.spad"
+kind = "spad"
+
+[[package]]
+name = "graph"
+set = "A"
+version = "2.0.1"
+entry = "GraphPackage.java"
+kind = "java"
+
+[[package]]
+name = "automation"
+set = "D"
+version = "1.0.0"
+entry = "automation.lua"
+kind = "lua"
+
+[[package]]
+name = "spad-core"
+set = "L"
+version = "5.0.0"
+entry = "spad-core.spad"
+kind = "spad"
+
+[[package]]
+name = "arcade-math"
+set = "A"
+version = "0.1.0"
+entry = "ArcadeMath.java"
+kind = "java"
+
+[[package]]
+name = "partybot"
+set = "D"
+version = "0.1.0"
+entry = "partybot.lua"
+kind = "lua"
+
+[[package]]
+name = "confetti"
+set = "P"
+version = "0.1.0"
+entry = "confetti.spad"
+kind = "spad"
+
+[[package]]
+name = "dicekit"
+set = "T"
+version = "0.1.0"
+entry = "dice.spad"
+kind = "spad"
+
+[[package]]
+name = "soundboard"
+set = "S"
+version = "0.1.0"
+entry = "soundboard.lua"
+kind = "lua"

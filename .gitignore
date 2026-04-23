@@ -3,7 +3,7 @@
 build/
 dist/
 --prefix
-
+--*
 # Dragon local install/cache state (generated per-user)
 .dragon/
 
@@ -13,6 +13,7 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+*.jar
 
 # Keep source + package indexes in repo
 !main/*.java
