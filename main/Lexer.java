@@ -103,7 +103,7 @@ class Lexer {
                 if (match(':')) {
                     addToken(TokenType.DOUBLE_COLON);
                 } else {
-                    throw error("Unexpected ':'");
+                    addToken(TokenType.COLON);
                 }
                 break;
             case ';':

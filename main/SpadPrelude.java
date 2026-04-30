@@ -117,6 +117,20 @@ public class SpadPrelude {
         return out;
     }
 
+    // Read the entire contents of a file into a string. Throws IOException if the
+    // file does not exist or cannot be read.
+    public static String ioRead(String path) throws java.io.IOException {
+        return new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
+                java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    // Write a string to a file, creating or overwriting the file as needed. Throws
+    // IOException if the write operation fails (e.g., permission denied).
+    public static void ioWrite(String path, String data) throws java.io.IOException {
+        java.nio.file.Files.write(java.nio.file.Paths.get(path),
+                data.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     // Priority-queue records are local to the helper and never exposed to the
     // language layer.
     private static class NodeDistance {

@@ -9,7 +9,7 @@ This document defines the language and build standards for SPAD and Dragon.
 
 ---
 
-# TSS-0001: SPAD Language Core Specification
+## TSS-0001: SPAD Language Core Specification
 
 ## Header
 
@@ -42,8 +42,8 @@ SPAD aims to be a small, predictable language that maps cleanly to Java while re
 - Block delimiters: braces `{ ... }` are the canonical block form. Parentheses may be used for grouping expressions.
 - Declarations: `var` for variables, `func` and `def` for functions (both accepted); type hints use `: Type` syntax.
 - Returns: functions MUST use explicit `return` to return values. Implicit last-expression returns are not part of the normative core.
-- Error handling: `try / except` and `finally` are the standard mechanism (Python-style); Ruby-style constructs are not supported.
-- String concatenation uses the `..` operator (Lua-style). No Ruby-style interpolation is defined in the core; a future string interpolation feature may be specified separately.
+- Error handling: `try / except` and `finally` are the standard mechanism.
+- String concatenation uses the `..` operator (Lua-style). No interpolation syntax is defined in the core; a future string interpolation feature may be specified separately.
 
 ## How To Read The Examples
 
@@ -258,14 +258,14 @@ Statements may end with newline or optional semicolon. Semicolons are not requir
 
 ## Compatibility and Migration Notes
 
-- Older documents that introduced Ruby-inspired constructs (e.g., `unless`, `yield`, symbol literals, Ruby-style interpolation and `begin/rescue/ensure`) are deprecated for the language core and will be removed. Implementations may offer optional compatibility layers, but such layers are not part of this normative specification.
-- Where prior examples showed Ruby-style interpolation, migrate to explicit concatenation or library helper functions.
+- Older documents that introduced legacy compatibility constructs (e.g., `unless`, `yield`, symbol literals, interpolation shortcuts, and `begin/rescue/ensure`) are deprecated for the language core and will be removed. Implementations may offer optional compatibility layers, but such layers are not part of this normative specification.
+- Where prior examples used interpolation shortcuts, migrate to explicit concatenation or library helper functions.
 
 ---
 
-# TSS-0002: Dragon Toolkit and Build Specification
+## TSS-0002: Dragon Toolkit and Build Specification
 
-## Header
+## Dragon Toolkit Header
 
 - TSS Number: 0002
 - Title: Dragon Toolkit, Resolution, and Build Profiles
@@ -275,7 +275,7 @@ Statements may end with newline or optional semicolon. Semicolons are not requir
 - Requires: TSS-0001
 - Supersedes: Informal Dragon toolkit notes
 
-## Abstract
+## Dragon Toolkit Abstract
 
 Dragon is the SPAD project manager and build orchestrator. This specification defines configuration, lockfile behavior, package resolution, profile discovery, and command-line execution semantics.
 
@@ -410,7 +410,7 @@ Tokens:
 - INT_LITERAL: `[0-9]+`
 - FLOAT_LITERAL: `[0-9]+\.[0-9]+`
 - STRING_LITERAL: `"(\\.|[^"])*"` (double-quoted only)
-- KEYWORDS: `var, function, def, class, if, elif, else, for, while, try, except, finally, return, import, project, match, in, true, false, null`
+- KEYWORDS: `var, function, def, if, elif, else, for, while, try, except, finally, return, import, project, match, in, true, false, null`
 - OPERATORS / PUNCT: `+ - * / % == != < > <= >= = .. |> ( ) { } [ ] , : ..` and `..` for concatenation
 
 The lexer SHOULD produce error tokens for illegal characters and report unterminated string literals with line/column locations.
@@ -424,13 +424,11 @@ top_level_decl ::= import_decl | project_decl | declaration
 import_decl    ::= 'import' qualified_name
 project_decl   ::= 'project' IDENTIFIER '{' { projection_entry } '}'
 projection_entry ::= IDENTIFIER '=' expression
-declaration    ::= var_decl | func_decl | class_decl
+declaration    ::= var_decl | func_decl
 var_decl       ::= 'var' IDENTIFIER [ ':' type ] [ '=' expression ]
 func_decl      ::= ( 'function' | 'def' ) IDENTIFIER '(' [ param_list ] ')' [ ':' type ] block
 param_list     ::= param { ',' param }
 param          ::= IDENTIFIER [ ':' type ]
-class_decl     ::= 'class' IDENTIFIER '{' { class_member } '}'
-class_member   ::= var_decl | func_decl
 block          ::= '{' { statement } '}'
 statement      ::= declaration | expr_stmt | if_stmt | while_stmt | for_stmt | return_stmt | try_stmt
 expr_stmt      ::= expression
@@ -475,15 +473,13 @@ This EBNF is intentionally compact; implementers should add precise precedence r
 
 The prelude is a small set of helpers automatically imported into every module. The following are the required entries and brief signatures. Implementations may provide additional helpers.
 
-- `print(x: Any): Void` — formatted output to stdout.
+- `print(x: Any): Any` — formatted output to stdout; returns the input value.
 - `toInt(x: Any): Int` — conversion, throws on invalid.
-- `toDouble(x: Any): Double`
-- `toString(x: Any): String`
-- `List.of<T>(...items): List<T>` — list constructor.
-- `Dict.of(...pairs): Dict` — map constructor.
-- `range(start: Int, end: Int): List<Int>` — produces integer list.
-- `io.read(path: String): String`
-- `io.write(path: String, data: String): Void`
+- `toFloat(x: Any): Double` — floating-point conversion, throws on invalid.
+- `toString(x: Any): String` — stringify any value.
+- `read(path: String): String` — read entire file contents as a string; throws on I/O error.
+- `write(path: String, data: String): Void` — write string to file; creates or overwrites; throws on I/O error.
+- `dijkstra(graph: Dict<String, Dict<String, Int>>, start: String): Dict<String, Int>` — shortest-path algorithm.
 
 Stdlib design note: keep the prelude small; prefer libraries for larger features.
 
@@ -511,7 +507,7 @@ Implementations SHOULD expose an API for IDE integration (language server protoc
 
 Diagnostic examples:
 
-```
+```text
 Error: Type mismatch: expected `Int` but found `String` at src/main.spad:12:8
 Hint: add `: Int` to the variable or call `toInt(...)` to convert.
 ```
@@ -556,7 +552,7 @@ var result = match status {
 
 ## Migration Guide (brief)
 
-- Remove Ruby-specific idioms: `unless`, `yield`, `:symbol` keys and `#{}` interpolation. Replace with explicit constructs:
+- Remove legacy idioms: `unless`, `yield`, `:symbol` keys and interpolation shortcuts. Replace with explicit constructs:
   - `unless cond then` -> `if (not cond) { ... }`
   - `yield` -> explicit callback parameter and call
   - interpolation -> `toString` and `..` concatenation or `String.format` via Java interop
@@ -564,9 +560,8 @@ var result = match status {
 
 ## Extension Points and Compatibility Layers
 
-Implementations may optionally provide compatibility flags (`--compat ruby`) to accept older Ruby-like examples, but such flags are not part of the normative standard and behavior under the compatibility layer is implementation-defined.
+Implementations may optionally provide compatibility flags for older syntax, but such flags are not part of the normative standard and behavior under the compatibility layer is implementation-defined.
 
 ## Concluding notes
 
 This expanded specification provides the concrete lexical, syntactic, semantic, and tooling guidance required to treat SPAD as a practical language for real projects. Implementers and library authors should follow the normative sections above for compatibility.
-

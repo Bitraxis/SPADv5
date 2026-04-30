@@ -37,6 +37,7 @@ enum TokenType {
     COMMA,
     DOT,
     RANGE,
+    COLON,
     DOUBLE_COLON,
     SEMICOLON,
     NEWLINE,

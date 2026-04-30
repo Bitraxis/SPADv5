@@ -90,16 +90,16 @@ class Parser {
     // Variable declarations allow optional inline type annotations.
     private Stmt parseVarDecl() {
         Token name = consume(TokenType.IDENTIFIER, "Expected variable name");
-        consume(TokenType.EQUAL, "Expected '=' after variable name");
-
         String explicitType = null;
-        Expr initializer;
 
-        if (check(TokenType.IDENTIFIER) && checkNext(TokenType.EQUAL)) {
-            explicitType = advance().lexeme;
-            consume(TokenType.EQUAL, "Expected second '=' before typed initializer");
+        // Check for type annotation: var name: Type = value
+        if (check(TokenType.COLON)) {
+            advance(); // consume ':'
+            explicitType = consume(TokenType.IDENTIFIER, "Expected type name after ':'").lexeme;
         }
-        initializer = parseExpression();
+
+        consume(TokenType.EQUAL, "Expected '=' after variable name or type");
+        Expr initializer = parseExpression();
         return new VarDecl(name.lexeme, explicitType, initializer);
     }
 
@@ -112,9 +112,15 @@ class Parser {
         if (!check(TokenType.RIGHT_PAREN)) {
             do {
                 Token paramName = consume(TokenType.IDENTIFIER, "Expected parameter name");
-                consume(TokenType.EQUAL, "Expected '=' after parameter name");
-                Token paramType = consume(TokenType.IDENTIFIER, "Expected parameter type");
-                parameters.add(new Parameter(paramName.lexeme, paramType.lexeme));
+                if (match(TokenType.COLON)) {
+                    Token paramType = consume(TokenType.IDENTIFIER, "Expected parameter type");
+                    parameters.add(new Parameter(paramName.lexeme, paramType.lexeme));
+                } else if (match(TokenType.EQUAL)) {
+                    Token paramType = consume(TokenType.IDENTIFIER, "Expected parameter type");
+                    parameters.add(new Parameter(paramName.lexeme, paramType.lexeme));
+                } else {
+                    throw error("Expected ':' or '=' after parameter name");
+                }
             } while (match(TokenType.COMMA));
         }
         consume(TokenType.RIGHT_PAREN, "Expected ')' after parameters");

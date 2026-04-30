@@ -397,6 +397,13 @@ class JavaEmitter {
                 if ("toString".equals(callee) && call.arguments.size() == 1) {
                     return "SpadPrelude.toStringValue(" + emitExpr(call.arguments.get(0)) + ")";
                 }
+                if ("read".equals(callee) && call.arguments.size() == 1) {
+                    return "SpadPrelude.ioRead(" + emitExpr(call.arguments.get(0)) + ")";
+                }
+                if ("write".equals(callee) && call.arguments.size() == 2) {
+                    return "SpadPrelude.ioWrite(" + emitExpr(call.arguments.get(0)) + ", "
+                            + emitExpr(call.arguments.get(1)) + ")";
+                }
                 if ("dijkstra".equals(callee)) {
                     String args = call.arguments.stream().map(this::emitExpr).collect(Collectors.joining(", "));
                     return "SpadPrelude.dijkstra(" + args + ")";
@@ -639,6 +646,8 @@ class JavaEmitter {
         knownFunctionReturnTypes.put("toInt", "int");
         knownFunctionReturnTypes.put("toFloat", "double");
         knownFunctionReturnTypes.put("toString", "String");
+        knownFunctionReturnTypes.put("read", "String");
+        knownFunctionReturnTypes.put("write", "void");
         knownFunctionReturnTypes.put("dijkstra", "Map<String, Object>");
         collectFunctionReturnTypes(statements);
     }

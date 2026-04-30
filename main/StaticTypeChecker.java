@@ -37,6 +37,8 @@ class StaticTypeChecker {
         builtins.put("toInt", new FunctionSig("toInt", List.of(SpadType.ANY), SpadType.INT));
         builtins.put("toFloat", new FunctionSig("toFloat", List.of(SpadType.ANY), SpadType.FLOAT));
         builtins.put("toString", new FunctionSig("toString", List.of(SpadType.ANY), SpadType.STRING));
+        builtins.put("read", new FunctionSig("read", List.of(SpadType.STRING), SpadType.STRING));
+        builtins.put("write", new FunctionSig("write", List.of(SpadType.STRING, SpadType.STRING), SpadType.VOID));
         builtins.put("dijkstra", new FunctionSig("dijkstra", List.of(SpadType.DICT, SpadType.STRING), SpadType.DICT));
         return builtins;
     }
