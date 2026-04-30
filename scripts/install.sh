@@ -1,10 +1,7 @@
-#!/usr/bin/env sh
-set -eu
-
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-PREFIX="$HOME/.local"
-ADD_PATH=0
+export SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+export PREFIX="$HOME/.local"
+export ADD_PATH=0
 
 while [ $# -gt 0 ]; do
   case "$1" in

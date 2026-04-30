@@ -296,7 +296,7 @@ class Parser {
         return new WhileStmt(condition, body);
     }
 
-    // Range loops capture the loop bounds so the emitter can build an integer loop.
+    // RangeRange loops capture the loop bounds so the emitter can build an integer loop.
     private Stmt parseForRangeStmt() {
         Token variable = consume(TokenType.IDENTIFIER, "Expected loop variable after for");
         consume(TokenType.IN, "Expected 'in' after loop variable");

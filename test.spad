@@ -1,0 +1,6 @@
+var score = 11
+if (score > 10) {
+  print("high")
+} elif  {
+  print("low")
+}

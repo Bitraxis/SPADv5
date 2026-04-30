@@ -17,6 +17,7 @@ class Lexer {
         KEYWORDS.put("from", TokenType.FROM);
         KEYWORDS.put("dragon", TokenType.DRAGON);
         KEYWORDS.put("func", TokenType.FUNC);
+        KEYWORDS.put("..", TokenType.RANGE);
         KEYWORDS.put("function", TokenType.FUNC);
         KEYWORDS.put("def", TokenType.FUNC);
         KEYWORDS.put("project", TokenType.PROJECT);
