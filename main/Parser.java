@@ -119,7 +119,7 @@ class Parser {
                     Token paramType = consume(TokenType.IDENTIFIER, "Expected parameter type");
                     parameters.add(new Parameter(paramName.lexeme, paramType.lexeme));
                 } else {
-                    throw error("Expected ':' or '=' after parameter name");
+                    throw error(peek(), "Expected ':' or '=' after parameter name");
                 }
             } while (match(TokenType.COMMA));
         }
