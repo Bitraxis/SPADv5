@@ -4,14 +4,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+// The parser consumes tokens and builds the abstract syntax tree used by later phases.
 class Parser {
     private final List<Token> tokens;
     private int current = 0;
 
+    // Parsing is token-driven; the parser keeps a moving cursor through the list.
     public Parser(List<Token> tokens) {
         this.tokens = tokens;
     }
 
+    // Parse a complete source file into a Program node.
     public Program parseProgram() {
         List<Stmt> statements = new ArrayList<>();
         skipSeparators();
@@ -22,6 +25,7 @@ class Parser {
         return new Program(statements);
     }
 
+    // Declarations are recognized first so top-level forms stay explicit.
     private Stmt parseDeclaration() {
         if (match(TokenType.IMPORT)) {
             return parseImportDecl();
@@ -50,6 +54,7 @@ class Parser {
         return parseStatement();
     }
 
+    // Imports record module metadata and optional source/version information.
     private Stmt parseImportDecl() {
         Token module = consume(TokenType.IDENTIFIER, "Expected module name after import");
         String versionConstraint = "*";
@@ -67,6 +72,7 @@ class Parser {
         return new ImportStmt(module.lexeme, versionConstraint, source);
     }
 
+    // Dragon use declarations carry a set of package names.
     private Stmt parseDragonUseDecl() {
         consume(TokenType.EQUAL, "Expected '=' after dragon");
         consume(TokenType.LEFT_BRACE, "Expected '{' after dragon =");
@@ -81,6 +87,7 @@ class Parser {
         return new DragonUseStmt(packages);
     }
 
+    // Variable declarations allow optional inline type annotations.
     private Stmt parseVarDecl() {
         Token name = consume(TokenType.IDENTIFIER, "Expected variable name");
         consume(TokenType.EQUAL, "Expected '=' after variable name");
@@ -96,6 +103,7 @@ class Parser {
         return new VarDecl(name.lexeme, explicitType, initializer);
     }
 
+    // Functions and defs share the same grammar and AST node.
     private Stmt parseFuncDecl() {
         Token name = consume(TokenType.IDENTIFIER, "Expected function name");
         consume(TokenType.LEFT_PAREN, "Expected '(' after function name");
@@ -121,6 +129,7 @@ class Parser {
         return new FuncDecl(name.lexeme, parameters, returnType, body);
     }
 
+    // Project blocks are parsed as nested statement lists.
     private Stmt parseProjectDecl() {
         Token name = consume(TokenType.IDENTIFIER, "Expected project name");
         consume(TokenType.LEFT_BRACE, "Expected '{' before project body");
@@ -128,6 +137,7 @@ class Parser {
         return new ProjectDecl(name.lexeme, body);
     }
 
+    // Projection declarations bind names to expression values.
     private Stmt parseProjectionDecl() {
         Token name = consume(TokenType.IDENTIFIER, "Expected projection name");
         consume(TokenType.EQUAL, "Expected '=' after projection name");
@@ -135,6 +145,8 @@ class Parser {
         return new ProjectionDecl(name.lexeme, value);
     }
 
+    // Automate declarations reuse the same shape as functions but mean automation
+    // entrypoints.
     private Stmt parseAutomateDecl() {
         Token name = consume(TokenType.IDENTIFIER, "Expected automation block name");
         consume(TokenType.LEFT_PAREN, "Expected '(' after automation block name");
@@ -160,6 +172,7 @@ class Parser {
         return new AutomateDecl(name.lexeme, parameters, returnType, body);
     }
 
+    // Export blocks are containers for nested declarations.
     private Stmt parseExportDecl() {
         Token name = consume(TokenType.IDENTIFIER, "Expected export block name");
         consume(TokenType.LEFT_BRACE, "Expected '{' before export block body");
@@ -167,6 +180,7 @@ class Parser {
         return new ExportDecl(name.lexeme, body);
     }
 
+    // Parse a brace-delimited statement list until the closing brace appears.
     private List<Stmt> parseBlockStatements() {
         List<Stmt> statements = new ArrayList<>();
         skipSeparators();
@@ -178,6 +192,8 @@ class Parser {
         return statements;
     }
 
+    // Statements include control flow, directives, blocks, and plain expression
+    // statements.
     private Stmt parseStatement() {
         if (match(TokenType.IF)) {
             return parseIfStmt();
@@ -187,6 +203,9 @@ class Parser {
         }
         if (match(TokenType.FOR)) {
             return parseForRangeStmt();
+        }
+        if (match(TokenType.TRY)) {
+            return parseTryStmt();
         }
         if (match(TokenType.DIRECTIVE)) {
             return parseDirectiveStmt();
@@ -203,6 +222,7 @@ class Parser {
         return new ExprStmt(parseExpression());
     }
 
+    // Directives are parsed as named calls with positional arguments.
     private Stmt parseDirectiveStmt() {
         Token name = consume(TokenType.IDENTIFIER, "Expected directive name");
         consume(TokenType.LEFT_PAREN, "Expected '(' after directive name");
@@ -216,18 +236,52 @@ class Parser {
         return new DirectiveStmt(name.lexeme, args);
     }
 
+    // Chained if/elif/else expressions are normalized into nested IfStmt nodes.
     private Stmt parseIfStmt() {
         consume(TokenType.LEFT_PAREN, "Expected '(' after if");
         Expr condition = parseExpression();
         consume(TokenType.RIGHT_PAREN, "Expected ')' after if condition");
         Stmt thenBranch = parseStatement();
         Stmt elseBranch = null;
+        while (match(TokenType.ELIF)) {
+            // Desugar chained elif into nested if-else for AST simplicity
+            consume(TokenType.LEFT_PAREN, "Expected '(' after elif");
+            Expr elifCond = parseExpression();
+            consume(TokenType.RIGHT_PAREN, "Expected ')' after elif condition");
+            Stmt elifThen = parseStatement();
+            thenBranch = new IfStmt(condition, thenBranch, new IfStmt(elifCond, elifThen, null));
+            condition = null; // we've consumed the original condition
+        }
         if (match(TokenType.ELSE)) {
             elseBranch = parseStatement();
         }
         return new IfStmt(condition, thenBranch, elseBranch);
     }
 
+    // Try blocks support optional except and finally sections.
+    private Stmt parseTryStmt() {
+        // try { ... } except (e) { ... } [ finally { ... } ]
+        consume(TokenType.LEFT_BRACE, "Expected '{' after try");
+        List<Stmt> tryBody = parseBlockStatements();
+        String exceptionName = null;
+        List<Stmt> exceptBody = null;
+        List<Stmt> finallyBody = null;
+        if (match(TokenType.EXCEPT)) {
+            consume(TokenType.LEFT_PAREN, "Expected '(' after except");
+            Token ex = consume(TokenType.IDENTIFIER, "Expected exception identifier in except");
+            exceptionName = ex.lexeme;
+            consume(TokenType.RIGHT_PAREN, "Expected ')' after except identifier");
+            consume(TokenType.LEFT_BRACE, "Expected '{' before except body");
+            exceptBody = parseBlockStatements();
+        }
+        if (match(TokenType.FINALLY)) {
+            consume(TokenType.LEFT_BRACE, "Expected '{' before finally body");
+            finallyBody = parseBlockStatements();
+        }
+        return new TryStmt(tryBody, exceptionName, exceptBody, finallyBody);
+    }
+
+    // While loops store a condition and a single body statement.
     private Stmt parseWhileStmt() {
         consume(TokenType.LEFT_PAREN, "Expected '(' after while");
         Expr condition = parseExpression();
@@ -236,6 +290,7 @@ class Parser {
         return new WhileStmt(condition, body);
     }
 
+    // Range loops capture the loop bounds so the emitter can build an integer loop.
     private Stmt parseForRangeStmt() {
         Token variable = consume(TokenType.IDENTIFIER, "Expected loop variable after for");
         consume(TokenType.IN, "Expected 'in' after loop variable");
@@ -246,10 +301,12 @@ class Parser {
         return new ForRangeStmt(variable.lexeme, start, end, body);
     }
 
+    // Expression parsing starts at the lowest-precedence assignment level.
     private Expr parseExpression() {
         return parseAssignment();
     }
 
+    // Assignment is right-associative and only permits variable targets.
     private Expr parseAssignment() {
         Expr expr = parsePipeline();
         if (match(TokenType.EQUAL)) {
@@ -263,8 +320,9 @@ class Parser {
         return expr;
     }
 
+    // Pipelines are lowered to function-call chaining for readability.
     private Expr parsePipeline() {
-        Expr expr = parseEquality();
+        Expr expr = parseOr();
         while (match(TokenType.PIPE_GT)) {
             Expr stage = parseCall();
             if (stage instanceof CallExpr) {
@@ -280,11 +338,32 @@ class Parser {
         return expr;
     }
 
+    // Equality sits above comparison in the precedence ladder.
     private Expr parseEquality() {
         Expr expr = parseComparison();
         while (match(TokenType.EQUAL_EQUAL, TokenType.BANG_EQUAL)) {
             Token op = previous();
             Expr right = parseComparison();
+            expr = new BinaryExpr(expr, op, right);
+        }
+        return expr;
+    }
+
+    private Expr parseOr() {
+        Expr expr = parseAnd();
+        while (match(TokenType.OR)) {
+            Token op = previous();
+            Expr right = parseAnd();
+            expr = new BinaryExpr(expr, op, right);
+        }
+        return expr;
+    }
+
+    private Expr parseAnd() {
+        Expr expr = parseEquality();
+        while (match(TokenType.AND)) {
+            Token op = previous();
+            Expr right = parseEquality();
             expr = new BinaryExpr(expr, op, right);
         }
         return expr;
@@ -301,8 +380,18 @@ class Parser {
     }
 
     private Expr parseTerm() {
-        Expr expr = parseFactor();
+        Expr expr = parseConcat();
         while (match(TokenType.PLUS, TokenType.MINUS)) {
+            Token op = previous();
+            Expr right = parseFactor();
+            expr = new BinaryExpr(expr, op, right);
+        }
+        return expr;
+    }
+
+    private Expr parseConcat() {
+        Expr expr = parseFactor();
+        while (match(TokenType.RANGE)) { // '..' used as concat when operands are strings
             Token op = previous();
             Expr right = parseFactor();
             expr = new BinaryExpr(expr, op, right);
@@ -321,7 +410,7 @@ class Parser {
     }
 
     private Expr parseUnary() {
-        if (match(TokenType.BANG, TokenType.MINUS)) {
+        if (match(TokenType.BANG, TokenType.MINUS, TokenType.NOT)) {
             Token op = previous();
             Expr right = parseUnary();
             return new UnaryExpr(op, right);
@@ -368,9 +457,12 @@ class Parser {
         if (match(TokenType.MATCH)) {
             return parseMatchExpr();
         }
-        if (match(TokenType.FALSE)) return new LiteralExpr(false);
-        if (match(TokenType.TRUE)) return new LiteralExpr(true);
-        if (match(TokenType.NULL)) return new LiteralExpr(null);
+        if (match(TokenType.FALSE))
+            return new LiteralExpr(false);
+        if (match(TokenType.TRUE))
+            return new LiteralExpr(true);
+        if (match(TokenType.NULL))
+            return new LiteralExpr(null);
         if (match(TokenType.INTEGER, TokenType.FLOAT, TokenType.STRING)) {
             return new LiteralExpr(previous().literal);
         }

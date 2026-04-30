@@ -6,14 +6,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+// The emitter converts the checked SPAD AST into Java source code.
 class JavaEmitter {
     private int tempCounter = 0;
     private final Map<String, String> knownFunctionReturnTypes = new HashMap<>();
 
+    // Emit a program using the default package name.
     public String emitProgram(Program program, String className) {
         return emitProgram(program, className, null);
     }
 
+    // Emit a complete Java compilation unit from the SPAD program.
     public String emitProgram(Program program, String className, String packageName) {
         knownFunctionReturnTypes.clear();
         seedKnownFunctionReturnTypes(program.statements);
@@ -56,6 +59,7 @@ class JavaEmitter {
         return out.toString();
     }
 
+    // Projects become nested static container classes.
     private void emitProject(ProjectDecl project, StringBuilder out, int level) {
         out.append(indent(level)).append("public static class Project_").append(project.name).append(" {\n");
         for (Stmt stmt : project.body) {
@@ -80,6 +84,7 @@ class JavaEmitter {
         out.append(indent(level)).append("}\n");
     }
 
+    // Automation declarations are emitted as Java static methods.
     private void emitAutomate(AutomateDecl auto, StringBuilder out, int level) {
         String params = auto.parameters.stream()
                 .map(p -> mapType(p.type) + " " + p.name)
@@ -105,6 +110,7 @@ class JavaEmitter {
         out.append(indent(level)).append("}\n");
     }
 
+    // Export blocks also become nested static container classes.
     private void emitExport(ExportDecl export, StringBuilder out, int level) {
         out.append(indent(level)).append("public static class Export_").append(export.name).append(" {\n");
         for (Stmt stmt : export.body) {
@@ -129,6 +135,7 @@ class JavaEmitter {
         out.append(indent(level)).append("}\n");
     }
 
+    // Standard functions map directly to Java static methods.
     private void emitFunction(FuncDecl fn, StringBuilder out, int level) {
         String params = fn.parameters.stream()
                 .map(p -> mapType(p.type) + " " + p.name)
@@ -154,6 +161,7 @@ class JavaEmitter {
         out.append(indent(level)).append("}\n");
     }
 
+    // Each statement kind is rendered into the closest Java equivalent.
     private void emitStatement(Stmt stmt, StringBuilder out, int level) {
         if (stmt instanceof ImportStmt) {
             ImportStmt imp = (ImportStmt) stmt;
@@ -165,6 +173,32 @@ class JavaEmitter {
                     .append(", ")
                     .append(quote(imp.source))
                     .append(");\n");
+            return;
+        }
+        if (stmt instanceof TryStmt) {
+            TryStmt t = (TryStmt) stmt;
+            out.append(indent(level)).append("try {\n");
+            for (Stmt s : t.tryBody) {
+                emitStatement(s, out, level + 1);
+            }
+            out.append(indent(level)).append("}\n");
+            if (t.exceptBody != null) {
+                String exName = t.exceptionName == null ? "e" : t.exceptionName;
+                out.append(" catch (Exception ").append(exName).append(") {\n");
+                for (Stmt s : t.exceptBody) {
+                    emitStatement(s, out, level + 1);
+                }
+                out.append(indent(level)).append("}\n");
+            }
+            if (t.finallyBody != null) {
+                out.append(" finally {\n");
+                for (Stmt s : t.finallyBody) {
+                    emitStatement(s, out, level + 1);
+                }
+                out.append(indent(level)).append("}\n");
+            } else {
+                out.append("\n");
+            }
             return;
         }
         if (stmt instanceof DragonUseStmt) {
@@ -288,11 +322,15 @@ class JavaEmitter {
         out.append(indent(level)).append("/* Unsupported statement */\n");
     }
 
+    // Expressions are emitted recursively so nested operations stay faithful to
+    // source order.
     private String emitExpr(Expr expr) {
         if (expr instanceof LiteralExpr) {
             Object value = ((LiteralExpr) expr).value;
-            if (value == null) return "null";
-            if (value instanceof String) return quote((String) value);
+            if (value == null)
+                return "null";
+            if (value instanceof String)
+                return quote((String) value);
             return String.valueOf(value);
         }
         if (expr instanceof VariableExpr) {
@@ -304,6 +342,15 @@ class JavaEmitter {
         }
         if (expr instanceof UnaryExpr) {
             UnaryExpr unary = (UnaryExpr) expr;
+            if (unary.operator.type == TokenType.BANG) {
+                return "!SpadPrelude.truthy(" + emitExpr(unary.right) + ")";
+            }
+            if (unary.operator.type == TokenType.NOT) {
+                return "!SpadPrelude.truthy(" + emitExpr(unary.right) + ")";
+            }
+            if (unary.operator.type == TokenType.MINUS) {
+                return "(-" + emitExpr(unary.right) + ")";
+            }
             return unary.operator.lexeme + emitExpr(unary.right);
         }
         if (expr instanceof BinaryExpr) {
@@ -314,7 +361,21 @@ class JavaEmitter {
             if (binary.operator.type == TokenType.BANG_EQUAL) {
                 return "(!SpadPrelude.eq(" + emitExpr(binary.left) + ", " + emitExpr(binary.right) + "))";
             }
-            return "(" + emitExpr(binary.left) + " " + binary.operator.lexeme + " " + emitExpr(binary.right) + ")";
+            if (binary.operator.type == TokenType.AND) {
+                return "(SpadPrelude.truthy(" + emitExpr(binary.left) + ") && SpadPrelude.truthy("
+                        + emitExpr(binary.right) + "))";
+            }
+            if (binary.operator.type == TokenType.OR) {
+                return "(SpadPrelude.truthy(" + emitExpr(binary.left) + ") || SpadPrelude.truthy("
+                        + emitExpr(binary.right) + "))";
+            }
+            if (binary.operator.type == TokenType.RANGE) {
+                // '..' used as concatenation in expressions
+                return "(SpadPrelude.toStringValue(" + emitExpr(binary.left) + ") + SpadPrelude.toStringValue("
+                        + emitExpr(binary.right) + "))";
+            }
+            return "(" + emitExpr(binary.left) + " " + mapOperator(binary.operator) + " " + emitExpr(binary.right)
+                    + ")";
         }
         if (expr instanceof GroupingExpr) {
             return "(" + emitExpr(((GroupingExpr) expr).expression) + ")";
@@ -394,27 +455,56 @@ class JavaEmitter {
         return "/* unsupported expr */ null";
     }
 
+    // SPAD types are mapped to their Java runtime representation.
     private String mapType(String type) {
         switch (type) {
-            case "Int": return "int";
-            case "Float": return "double";
-            case "String": return "String";
-            case "Bool": return "boolean";
-            case "List": return "List<Object>";
-            case "Dict": return "Map<String, Object>";
-            case "Void": return "void";
-            default: return "Object";
+            case "Int":
+                return "int";
+            case "Float":
+                return "double";
+            case "String":
+                return "String";
+            case "Bool":
+                return "boolean";
+            case "List":
+                return "List<Object>";
+            case "Dict":
+                return "Map<String, Object>";
+            case "Void":
+                return "void";
+            default:
+                return "Object";
         }
     }
 
+    // Java string literals need escaping before insertion into generated code.
     private String quote(String value) {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
+    // Some token lexemes are mapped to Java operator text for cleaner emission.
+    private String mapOperator(Token operator) {
+        return switch (operator.type) {
+            case PLUS -> "+";
+            case MINUS -> "-";
+            case STAR -> "*";
+            case SLASH -> "/";
+            case PERCENT -> "%";
+            case GREATER -> ">";
+            case GREATER_EQUAL -> ">=";
+            case LESS -> "<";
+            case LESS_EQUAL -> "<=";
+            default -> operator.lexeme;
+        };
+    }
+
+    // Indentation is generated with spaces so the output Java stays readable.
     private String indent(int level) {
         return "    ".repeat(Math.max(0, level));
     }
 
+    // Branch bodies are wrapped consistently whether the source used a block or a
+    // single statement.
     private void emitBranchBody(Stmt body, StringBuilder out, int level) {
         if (body instanceof BlockStmt) {
             out.append("{\n");
@@ -429,11 +519,14 @@ class JavaEmitter {
         }
     }
 
+    // Temporary names avoid collisions in emitted helper code.
     private String nextTemp(String prefix) {
         tempCounter++;
         return "__" + prefix + "_" + tempCounter;
     }
 
+    // Match expressions need a best-effort Java generic type for the lambda
+    // wrapper.
     private String inferMatchGenericType(MatchExpr match) {
         String concrete = null;
         for (MatchArm arm : match.arms) {
@@ -455,6 +548,8 @@ class JavaEmitter {
         return boxType(concrete);
     }
 
+    // Lightweight type inference helps the emitter choose the best Java operator
+    // shape.
     private String inferExprType(Expr expr) {
         if (expr instanceof LiteralExpr) {
             Object value = ((LiteralExpr) expr).value;
@@ -475,10 +570,19 @@ class JavaEmitter {
             }
         }
         if (expr instanceof UnaryExpr) {
-            return inferExprType(((UnaryExpr) expr).right);
+            UnaryExpr u = (UnaryExpr) expr;
+            if (u.operator.type == TokenType.BANG || u.operator.type == TokenType.NOT)
+                return "boolean";
+            return inferExprType(u.right);
         }
         if (expr instanceof BinaryExpr) {
             BinaryExpr binary = (BinaryExpr) expr;
+            if (binary.operator.type == TokenType.AND || binary.operator.type == TokenType.OR) {
+                return "boolean";
+            }
+            if (binary.operator.type == TokenType.RANGE) {
+                return "String";
+            }
             String left = inferExprType(binary.left);
             String right = inferExprType(binary.right);
             if (binary.operator.type == TokenType.PLUS) {
@@ -514,6 +618,7 @@ class JavaEmitter {
         return "Object";
     }
 
+    // Primitive Java types are boxed when a generic context needs an object type.
     private String boxType(String type) {
         switch (type) {
             case "int":
@@ -527,6 +632,8 @@ class JavaEmitter {
         }
     }
 
+    // Seed the function-return table before walking the AST for nested
+    // declarations.
     private void seedKnownFunctionReturnTypes(List<Stmt> statements) {
         knownFunctionReturnTypes.put("print", "Object");
         knownFunctionReturnTypes.put("toInt", "int");
@@ -536,6 +643,8 @@ class JavaEmitter {
         collectFunctionReturnTypes(statements);
     }
 
+    // Walk nested declarations and remember their Java return types for later
+    // emission.
     private void collectFunctionReturnTypes(List<Stmt> statements) {
         for (Stmt stmt : statements) {
             if (stmt instanceof FuncDecl) {

@@ -9,9 +9,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+// The static checker enforces language rules before code generation begins.
 class StaticTypeChecker {
     private final Deque<Map<String, SpadType>> scopes = new ArrayDeque<>();
 
+    // Entry point for semantic validation across the full program.
     public void check(Program program) {
         scopes.clear();
         pushScope();
@@ -27,6 +29,8 @@ class StaticTypeChecker {
         popScope();
     }
 
+    // Builtins are registered up front so user code can call them without
+    // declarations.
     private Map<String, FunctionSig> createBuiltinFunctions() {
         Map<String, FunctionSig> builtins = new HashMap<>();
         builtins.put("print", new FunctionSig("print", List.of(SpadType.ANY), SpadType.ANY));
@@ -37,6 +41,8 @@ class StaticTypeChecker {
         return builtins;
     }
 
+    // Function signatures are collected before body checking so calls can resolve
+    // forward references.
     private void collectFunctionSignatures(List<Stmt> statements, Map<String, FunctionSig> target) {
         for (Stmt stmt : statements) {
             if (stmt instanceof FuncDecl fn) {
@@ -47,6 +53,7 @@ class StaticTypeChecker {
         }
     }
 
+    // Convert parsed parameter and return type names into internal checker types.
     private FunctionSig createSignature(String name, List<Parameter> params, String returnTypeName) {
         List<SpadType> args = new ArrayList<>();
         for (Parameter p : params) {
@@ -55,6 +62,7 @@ class StaticTypeChecker {
         return new FunctionSig(name, args, fromTypeName(returnTypeName));
     }
 
+    // Each statement is checked against the current scope and expected return type.
     private void checkStmt(Stmt stmt, Map<String, FunctionSig> functions, SpadType expectedReturn) {
         if (stmt instanceof ImportStmt || stmt instanceof DragonUseStmt || stmt instanceof DirectiveStmt) {
             return;
@@ -113,6 +121,24 @@ class StaticTypeChecker {
             checkStmt(whileStmt.body, functions, expectedReturn);
             return;
         }
+        if (stmt instanceof TryStmt tryStmt) {
+            // Type-check try/except/finally bodies independently
+            for (Stmt s : tryStmt.tryBody)
+                checkStmt(s, functions, expectedReturn);
+            if (tryStmt.exceptBody != null) {
+                pushScope();
+                if (tryStmt.exceptionName != null)
+                    define(tryStmt.exceptionName, SpadType.ANY);
+                for (Stmt s : tryStmt.exceptBody)
+                    checkStmt(s, functions, expectedReturn);
+                popScope();
+            }
+            if (tryStmt.finallyBody != null) {
+                for (Stmt s : tryStmt.finallyBody)
+                    checkStmt(s, functions, expectedReturn);
+            }
+            return;
+        }
         if (stmt instanceof ForRangeStmt forRange) {
             SpadType startType = inferExprType(forRange.start, functions);
             SpadType endType = inferExprType(forRange.end, functions);
@@ -157,12 +183,13 @@ class StaticTypeChecker {
         throw error("Unsupported statement in type checker: " + stmt.getClass().getSimpleName());
     }
 
+    // Callable bodies get their own scope and must satisfy their declared return
+    // contract.
     private void checkCallable(
             List<Parameter> parameters,
             String returnTypeName,
             List<Stmt> body,
-            Map<String, FunctionSig> functions
-    ) {
+            Map<String, FunctionSig> functions) {
         SpadType expectedReturn = fromTypeName(returnTypeName);
         pushScope();
         for (Parameter parameter : parameters) {
@@ -184,13 +211,19 @@ class StaticTypeChecker {
         popScope();
     }
 
+    // Expression typing is recursive and mirrors the AST structure.
     private SpadType inferExprType(Expr expr, Map<String, FunctionSig> functions) {
         if (expr instanceof LiteralExpr lit) {
-            if (lit.value == null) return SpadType.NULL;
-            if (lit.value instanceof String) return SpadType.STRING;
-            if (lit.value instanceof Boolean) return SpadType.BOOL;
-            if (lit.value instanceof Double || lit.value instanceof Float) return SpadType.FLOAT;
-            if (lit.value instanceof Number) return SpadType.INT;
+            if (lit.value == null)
+                return SpadType.NULL;
+            if (lit.value instanceof String)
+                return SpadType.STRING;
+            if (lit.value instanceof Boolean)
+                return SpadType.BOOL;
+            if (lit.value instanceof Double || lit.value instanceof Float)
+                return SpadType.FLOAT;
+            if (lit.value instanceof Number)
+                return SpadType.INT;
             return SpadType.ANY;
         }
         if (expr instanceof VariableExpr var) {
@@ -215,6 +248,10 @@ class StaticTypeChecker {
             SpadType right = inferExprType(unary.right, functions);
             if (unary.operator.type == TokenType.BANG) {
                 ensureBool(right, "'!' requires Bool");
+                return SpadType.BOOL;
+            }
+            if (unary.operator.type == TokenType.NOT) {
+                ensureBool(right, "'not' requires Bool");
                 return SpadType.BOOL;
             }
             if (unary.operator.type == TokenType.MINUS) {
@@ -281,6 +318,7 @@ class StaticTypeChecker {
         return SpadType.ANY;
     }
 
+    // Match expressions infer a common result type across all arms.
     private SpadType inferMatchType(MatchExpr matchExpr, Map<String, FunctionSig> functions) {
         SpadType valueType = inferExprType(matchExpr.value, functions);
         if (matchExpr.arms.isEmpty()) {
@@ -305,9 +343,11 @@ class StaticTypeChecker {
             } else {
                 SpadType patternType = inferExprType(arm.pattern, functions);
                 if (!isComparable(valueType, patternType)) {
-                    throw error("Match pattern type " + patternType + " is incompatible with matched type " + valueType);
+                    throw error(
+                            "Match pattern type " + patternType + " is incompatible with matched type " + valueType);
                 }
-                if (valueType == SpadType.BOOL && arm.pattern instanceof LiteralExpr lit && lit.value instanceof Boolean b) {
+                if (valueType == SpadType.BOOL && arm.pattern instanceof LiteralExpr lit
+                        && lit.value instanceof Boolean b) {
                     boolPatterns.add(b);
                 }
             }
@@ -327,7 +367,8 @@ class StaticTypeChecker {
         popScope();
 
         if (!hasExhaustiveWildcard) {
-            boolean boolCovered = valueType == SpadType.BOOL && boolPatterns.contains(Boolean.TRUE) && boolPatterns.contains(Boolean.FALSE);
+            boolean boolCovered = valueType == SpadType.BOOL && boolPatterns.contains(Boolean.TRUE)
+                    && boolPatterns.contains(Boolean.FALSE);
             if (!boolCovered) {
                 throw error("Non-exhaustive match: add '_' arm or cover all Bool cases");
             }
@@ -336,6 +377,8 @@ class StaticTypeChecker {
         return resultType == null ? SpadType.ANY : resultType;
     }
 
+    // Binary operators are grouped here so arithmetic, comparison, and logic rules
+    // stay centralized.
     private SpadType inferBinaryType(TokenType operator, SpadType left, SpadType right) {
         switch (operator) {
             case PLUS:
@@ -365,6 +408,16 @@ class StaticTypeChecker {
                     throw error("Cannot compare " + left + " with " + right);
                 }
                 return SpadType.BOOL;
+            case AND:
+            case OR:
+                // logical operators produce Bool; operands may be Bool or Any (truthy
+                // semantics)
+                return SpadType.BOOL;
+            case RANGE:
+                // '..' used for concatenation in expressions: prefer String
+                if (left == SpadType.STRING || right == SpadType.STRING)
+                    return SpadType.STRING;
+                return SpadType.STRING;
             default:
                 return SpadType.ANY;
         }
@@ -386,6 +439,8 @@ class StaticTypeChecker {
         return SpadType.ANY;
     }
 
+    // Assignment compatibility is intentionally permissive only for compatible
+    // numeric and any-typed values.
     private boolean isAssignable(SpadType expected, SpadType actual) {
         if (expected == SpadType.ANY || actual == SpadType.ANY) {
             return true;
@@ -396,12 +451,14 @@ class StaticTypeChecker {
         if (expected == SpadType.FLOAT && actual == SpadType.INT) {
             return true;
         }
-        if (actual == SpadType.NULL && expected != SpadType.INT && expected != SpadType.FLOAT && expected != SpadType.BOOL) {
+        if (actual == SpadType.NULL && expected != SpadType.INT && expected != SpadType.FLOAT
+                && expected != SpadType.BOOL) {
             return true;
         }
         return false;
     }
 
+    // Comparable operands are either identical, numeric, or widened by Any.
     private boolean isComparable(SpadType left, SpadType right) {
         if (left == SpadType.ANY || right == SpadType.ANY) {
             return true;
@@ -412,22 +469,26 @@ class StaticTypeChecker {
         return isNumeric(left) && isNumeric(right);
     }
 
+    // Small helper to keep boolean errors consistent.
     private void ensureBool(SpadType value, String message) {
         if (value != SpadType.BOOL && value != SpadType.ANY) {
             throw error(message + " (got " + value + ")");
         }
     }
 
+    // Numeric checks are centralized so arithmetic rules stay uniform.
     private void ensureNumeric(SpadType value, String message) {
         if (!isNumeric(value) && value != SpadType.ANY) {
             throw error(message + " (got " + value + ")");
         }
     }
 
+    // The checker recognizes the numeric subset used by arithmetic and ranges.
     private boolean isNumeric(SpadType value) {
         return value == SpadType.INT || value == SpadType.FLOAT;
     }
 
+    // Widen mixed numeric operations to the wider of the two types.
     private SpadType promoteNumeric(SpadType left, SpadType right) {
         if (left == SpadType.FLOAT || right == SpadType.FLOAT) {
             return SpadType.FLOAT;
@@ -435,6 +496,7 @@ class StaticTypeChecker {
         return SpadType.INT;
     }
 
+    // Parse-time type names are mapped into the internal enum representation.
     private SpadType fromTypeName(String name) {
         if (name == null) {
             return SpadType.ANY;
@@ -451,10 +513,12 @@ class StaticTypeChecker {
         };
     }
 
+    // Definition writes into the current lexical scope.
     private void define(String name, SpadType type) {
         scopes.peek().put(name, type);
     }
 
+    // Resolution walks outward through nested scopes until it finds a binding.
     private SpadType resolve(String name) {
         for (Map<String, SpadType> scope : scopes) {
             if (scope.containsKey(name)) {
@@ -464,14 +528,17 @@ class StaticTypeChecker {
         return null;
     }
 
+    // Each new block or callable gets a fresh scope frame.
     private void pushScope() {
         scopes.push(new HashMap<>());
     }
 
+    // Pop the most recent lexical scope after leaving the block.
     private void popScope() {
         scopes.pop();
     }
 
+    // Errors are normalized so diagnostics are easy to read from the CLI.
     private RuntimeException error(String message) {
         return new RuntimeException("Type error -> " + message);
     }

@@ -26,6 +26,8 @@ import javax.tools.ToolProvider;
 public class main {
     private static final String DEFAULT_PACKAGE = "main";
 
+    // Entry point for the CLI compiler. It only prints a short error message so
+    // the caller gets a simple failure mode instead of a Java stack trace.
     public static void main(String[] args) {
         try {
             run(args);
@@ -35,6 +37,8 @@ public class main {
         }
     }
 
+    // Dispatch the requested compiler action: help, compile, print generated
+    // Java, build a bundle, or run the compiled class.
     private static void run(String[] args) throws Exception {
         if (args.length == 0 || hasArg(args, "--help") || hasArg(args, "-h")) {
             printUsage();
@@ -66,12 +70,13 @@ public class main {
         }
     }
 
+    // Lexes the SPAD source, parses it into an AST, performs static checks,
+    // emits Java source, and compiles the generated Java into class files.
     private static CompileResult compileSource(
             String source,
             String className,
             Path outDir,
-            Path inputFile
-    ) throws IOException {
+            Path inputFile) throws IOException {
         Lexer lexer = new Lexer(source);
         List<Token> tokens = lexer.lex();
 
@@ -96,7 +101,10 @@ public class main {
         return new CompileResult(className, DEFAULT_PACKAGE, generatedJava, classOutputDir, javaCode);
     }
 
-    private static void compileJavaSources(List<Path> generatedSources, Path classOutputDir, Path inputFile) throws IOException {
+    // Compiles the generated Java together with the shared runtime helpers used
+    // by emitted SPAD programs.
+    private static void compileJavaSources(List<Path> generatedSources, Path classOutputDir, Path inputFile)
+            throws IOException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
             throw new IllegalStateException("JDK compiler not found. Run this with a JDK (not a JRE).");
@@ -113,11 +121,13 @@ public class main {
         allSources.addAll(generatedSources);
 
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
-        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, Locale.getDefault(), null)) {
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, Locale.getDefault(),
+                null)) {
             Iterable<? extends JavaFileObject> units = fileManager.getJavaFileObjectsFromPaths(allSources);
             List<String> options = List.of("-d", classOutputDir.toString());
 
-            JavaCompiler.CompilationTask task = compiler.getTask(new PrintWriter(System.err), fileManager, diagnostics, options, null, units);
+            JavaCompiler.CompilationTask task = compiler.getTask(new PrintWriter(System.err), fileManager, diagnostics,
+                    options, null, units);
             boolean success = Boolean.TRUE.equals(task.call());
             if (!success) {
                 StringBuilder message = new StringBuilder("javac failed:\n");
@@ -136,6 +146,7 @@ public class main {
         }
     }
 
+    // Walk upward from the input file until we find the repository root.
     private static Path findProjectRoot(Path startDir) {
         Path current = startDir;
         while (current != null) {
@@ -148,8 +159,10 @@ public class main {
         return null;
     }
 
+    // Load the compiled class with a dedicated classloader and invoke its main
+    // method so the generated artifact can be exercised immediately.
     private static void runCompiledMain(Path classOutputDir, String packageName, String className) throws Exception {
-        try (URLClassLoader loader = new URLClassLoader(new URL[]{classOutputDir.toUri().toURL()})) {
+        try (URLClassLoader loader = new URLClassLoader(new URL[] { classOutputDir.toUri().toURL() })) {
             String fqcn = packageName + "." + className;
             Class<?> generatedClass = Class.forName(fqcn, true, loader);
             Method method = generatedClass.getMethod("main", String[].class);
@@ -158,7 +171,10 @@ public class main {
         }
     }
 
-    private static Path createJreBundle(Path classOutputDir, String packageName, String className, Path outputFile) throws IOException {
+    // Package compiled class files into a runnable jar-style bundle using the
+    // requested .jre filename convention.
+    private static Path createJreBundle(Path classOutputDir, String packageName, String className, Path outputFile)
+            throws IOException {
         String mainClass = packageName + "." + className;
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
@@ -171,8 +187,7 @@ public class main {
 
         try (JarOutputStream jar = new JarOutputStream(
                 Files.newOutputStream(outputFile, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING),
-                manifest
-        )) {
+                manifest)) {
             List<Path> classFiles = new ArrayList<>();
             try (var stream = Files.walk(classOutputDir)) {
                 stream.filter(Files::isRegularFile).forEach(classFiles::add);
@@ -192,6 +207,7 @@ public class main {
         return outputFile;
     }
 
+    // Parse CLI switches and validate the input file before compilation starts.
     private static CliOptions parseOptions(String[] args) {
         Path inputFile = null;
         Path outDir = Paths.get("build", "spad");
@@ -256,6 +272,7 @@ public class main {
         return new CliOptions(inputFile, outDir, className, runCompiledClass, printJava, emitJreBundle, jreOutputPath);
     }
 
+    // Shared helper for options that require a value immediately after the flag.
     private static int ensureValue(String[] args, int currentIndex, String option) {
         int valueIndex = currentIndex + 1;
         if (valueIndex >= args.length) {
@@ -264,6 +281,7 @@ public class main {
         return valueIndex;
     }
 
+    // Strip a file extension so the compiler can derive a stable class name.
     private static String stripExtension(String fileName) {
         int dot = fileName.lastIndexOf('.');
         if (dot <= 0) {
@@ -272,6 +290,7 @@ public class main {
         return fileName.substring(0, dot);
     }
 
+    // Turn an arbitrary file name into a legal Java identifier.
     private static String sanitizeClassName(String rawName) {
         if (rawName == null || rawName.isBlank()) {
             return "SpadGenerated";
@@ -289,6 +308,7 @@ public class main {
         return out.toString();
     }
 
+    // Convenience helper for flag detection.
     private static boolean hasArg(String[] args, String value) {
         for (String arg : args) {
             if (value.equals(arg)) {
@@ -298,9 +318,11 @@ public class main {
         return false;
     }
 
+    // Print the CLI help text so users can discover the supported workflow.
     private static void printUsage() {
         System.out.println("SPAD JVM compiler");
-        System.out.println("Usage: java main.main <file.spad> [--out <dir>] [--class <ClassName>] [--run] [--print-java] [--jre] [--jre-out <file.jre>]");
+        System.out.println(
+                "Usage: java main.main <file.spad> [--out <dir>] [--class <ClassName>] [--run] [--print-java] [--jre] [--jre-out <file.jre>]");
     }
 
     private static final class CliOptions {
@@ -319,8 +341,7 @@ public class main {
                 boolean runCompiledClass,
                 boolean printJava,
                 boolean emitJreBundle,
-                Path jreOutputPath
-        ) {
+                Path jreOutputPath) {
             this.inputFile = inputFile;
             this.outDir = outDir;
             this.className = className;
@@ -343,8 +364,7 @@ public class main {
                 String packageName,
                 Path generatedJavaPath,
                 Path classOutputDir,
-                String generatedJava
-        ) {
+                String generatedJava) {
             this.className = className;
             this.packageName = packageName;
             this.generatedJavaPath = generatedJavaPath;
